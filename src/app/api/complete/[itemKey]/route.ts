@@ -1,16 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server'
-
-export const config = {
-  api: { bodyParser: false },
-}
-
-// Increase Next.js body size limit for file uploads
-export const maxDuration = 30
 import { runMigrations } from '@/db/migrate'
 import { getParticipantFromRequest } from '@/lib/auth'
 import { query } from '@/db/client'
 import { getItemByKey, CompletionRow } from '@/lib/scores'
 import { savePhoto, deletePhoto, MAX_UPLOAD_SIZE } from '@/lib/photos'
+
+export const maxDuration = 30
 
 export async function POST(
   request: NextRequest,
@@ -29,7 +24,8 @@ export async function POST(
     return NextResponse.json({ error: 'Item not found' }, { status: 404 })
   }
 
-  const bonusParam = new URL(request.url).searchParams.get('bonus')
+  // Use URL with fallback base to handle relative URLs from Railway's proxy
+  const bonusParam = new URL(request.url, 'http://localhost').searchParams.get('bonus')
   const bonusAwarded = bonusParam === 'true'
 
   let photoFilename: string | null = null
