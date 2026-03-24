@@ -96,8 +96,8 @@ function ItemCard({
       setSelectedFile(null)
       setPreviewUrl(null)
       if (fileInputRef.current) fileInputRef.current.value = ''
-    } catch {
-      setError('Network error. Try again.')
+    } catch (err) {
+      setError('Upload failed: ' + (err instanceof Error ? err.message : String(err)))
     }
     setUploading(false)
   }

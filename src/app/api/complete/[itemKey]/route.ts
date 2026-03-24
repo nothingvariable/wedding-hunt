@@ -1,4 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server'
+
+export const config = {
+  api: { bodyParser: false },
+}
+
+// Increase Next.js body size limit for file uploads
+export const maxDuration = 30
 import { runMigrations } from '@/db/migrate'
 import { getParticipantFromRequest } from '@/lib/auth'
 import { query } from '@/db/client'
