@@ -268,7 +268,6 @@ function ItemCard({
                 ref={fileInputRef}
                 type="file"
                 accept="image/*"
-                capture="environment"
                 onChange={handleFileChange}
                 className="hidden"
                 id={`file-${item.key}`}
