@@ -75,12 +75,30 @@ function ItemCard({
     setError('')
 
     try {
-      // Read file as base64 — more reliable than FormData on iOS Safari
+      // Use canvas to decode + re-encode as JPEG — avoids iOS Safari FileReader/FormData bugs
       const base64 = await new Promise<string>((resolve, reject) => {
-        const reader = new FileReader()
-        reader.onload = () => resolve(reader.result as string)
-        reader.onerror = reject
-        reader.readAsDataURL(selectedFile)
+        const objectUrl = URL.createObjectURL(selectedFile)
+        const img = new window.Image()
+        img.onload = () => {
+          URL.revokeObjectURL(objectUrl)
+          // Scale down if larger than 2048px on longest side to keep payload reasonable
+          const MAX = 2048
+          let w = img.naturalWidth
+          let h = img.naturalHeight
+          if (w > MAX || h > MAX) {
+            if (w > h) { h = Math.round(h * MAX / w); w = MAX }
+            else { w = Math.round(w * MAX / h); h = MAX }
+          }
+          const canvas = document.createElement('canvas')
+          canvas.width = w
+          canvas.height = h
+          const ctx = canvas.getContext('2d')
+          if (!ctx) { reject(new Error('Canvas unavailable')); return }
+          ctx.drawImage(img, 0, 0, w, h)
+          resolve(canvas.toDataURL('image/jpeg', 0.85))
+        }
+        img.onerror = () => { URL.revokeObjectURL(objectUrl); reject(new Error('Image load failed')) }
+        img.src = objectUrl
       })
 
       const res = await fetch(`/api/complete/${item.key}`, {
@@ -89,7 +107,7 @@ function ItemCard({
           Authorization: `Bearer ${token}`,
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ photo: base64, mimeType: selectedFile.type }),
+        body: JSON.stringify({ photo: base64, mimeType: 'image/jpeg' }),
       })
 
       if (!res.ok) {
