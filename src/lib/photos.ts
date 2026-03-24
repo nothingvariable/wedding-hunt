@@ -1,7 +1,7 @@
 import fs from 'fs'
 import path from 'path'
 
-export const PHOTO_DIR = process.env.PHOTO_DIR || '/data/photos'
+export const PHOTO_DIR = process.env.PHOTO_DIR || '/tmp/photos'
 export const MAX_UPLOAD_SIZE = parseInt(process.env.MAX_UPLOAD_SIZE || '10485760', 10) // 10MB default
 
 let photoDirEnsured = false
