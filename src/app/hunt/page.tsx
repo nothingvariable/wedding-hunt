@@ -4,6 +4,7 @@ import { useState, useEffect, useRef, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { TEAMS, TeamKey } from '@/data/teams'
 import { CATEGORY_NAMES, CATEGORY_ORDER } from '@/lib/scores'
+import type { GalleryPhoto } from '@/app/gallery/page'
 
 interface HuntItem {
   key: string
@@ -384,15 +385,19 @@ function CategorySection({
   items,
   completionMap,
   token,
+  photos,
   onCompleted,
   onDeleted,
+  onPhotoClick,
 }: {
   category: string
   items: HuntItem[]
   completionMap: Map<string, Completion>
   token: string
+  photos: GalleryPhoto[]
   onCompleted: (c: Completion) => void
   onDeleted: (key: string) => void
+  onPhotoClick: (photo: GalleryPhoto) => void
 }) {
   const [open, setOpen] = useState(true)
   const completedCount = items.filter((i) => completionMap.has(i.key)).length
@@ -413,6 +418,31 @@ function CategorySection({
         </div>
         <span className="text-gray-500 text-xs">{open ? '▲' : '▼'}</span>
       </button>
+
+      {/* Photo thumbnails for this category */}
+      {photos.length > 0 && (
+        <div className="flex gap-2 overflow-x-auto pb-2 mb-2 scrollbar-hide">
+          {photos.map((photo) => (
+            <button
+              key={photo.filename}
+              onClick={() => onPhotoClick(photo)}
+              className="relative flex-shrink-0 w-14 h-14 rounded-lg overflow-hidden bg-gray-800 group"
+            >
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={`/api/photos/${photo.filename}`}
+                alt={photo.itemTitle}
+                className="w-full h-full object-cover group-hover:opacity-80 transition-opacity"
+              />
+              <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent flex items-end">
+                <p className="text-white text-[8px] leading-tight px-0.5 pb-0.5 truncate w-full">
+                  {photo.participantName.split(' ')[0]}
+                </p>
+              </div>
+            </button>
+          ))}
+        </div>
+      )}
 
       {open && (
         <div className="space-y-2">
@@ -438,6 +468,8 @@ export default function HuntPage() {
   const [items, setItems] = useState<HuntItem[]>([])
   const [loading, setLoading] = useState(true)
   const [completionMap, setCompletionMap] = useState<Map<string, Completion>>(new Map())
+  const [galleryByCategory, setGalleryByCategory] = useState<Map<string, GalleryPhoto[]>>(new Map())
+  const [lightboxPhoto, setLightboxPhoto] = useState<GalleryPhoto | null>(null)
   const tokenRef = useRef<string>('')
 
   const refreshMe = useCallback(async (token: string) => {
@@ -464,7 +496,8 @@ export default function HuntPage() {
     Promise.all([
       fetch('/api/me', { headers: { Authorization: `Bearer ${token}` } }),
       fetch('/api/items'),
-    ]).then(async ([meRes, itemsRes]) => {
+      fetch('/api/gallery', { headers: { Authorization: `Bearer ${token}` } }),
+    ]).then(async ([meRes, itemsRes, galleryRes]) => {
       if (!meRes.ok) {
         localStorage.removeItem('hunt_token')
         router.replace('/')
@@ -478,11 +511,35 @@ export default function HuntPage() {
       const map = new Map<string, Completion>()
       for (const c of meJson.completions) map.set(c.item_key, c)
       setCompletionMap(map)
+
+      if (galleryRes.ok) {
+        const galleryJson: { photos: GalleryPhoto[] } = await galleryRes.json()
+        const byCategory = new Map<string, GalleryPhoto[]>()
+        for (const photo of galleryJson.photos) {
+          if (!byCategory.has(photo.category)) byCategory.set(photo.category, [])
+          byCategory.get(photo.category)!.push(photo)
+        }
+        setGalleryByCategory(byCategory)
+      }
+
       setLoading(false)
     }).catch(() => {
       setLoading(false)
     })
   }, [router])
+
+  const refreshGallery = useCallback(async (token: string) => {
+    const res = await fetch('/api/gallery', { headers: { Authorization: `Bearer ${token}` } })
+    if (res.ok) {
+      const data: { photos: GalleryPhoto[] } = await res.json()
+      const byCategory = new Map<string, GalleryPhoto[]>()
+      for (const photo of data.photos) {
+        if (!byCategory.has(photo.category)) byCategory.set(photo.category, [])
+        byCategory.get(photo.category)!.push(photo)
+      }
+      setGalleryByCategory(byCategory)
+    }
+  }, [])
 
   const handleCompleted = useCallback((c: Completion) => {
     setCompletionMap((prev) => {
@@ -493,8 +550,9 @@ export default function HuntPage() {
     // Refresh full me data for score update
     if (tokenRef.current) {
       refreshMe(tokenRef.current)
+      refreshGallery(tokenRef.current)
     }
-  }, [refreshMe])
+  }, [refreshMe, refreshGallery])
 
   const handleDeleted = useCallback((key: string) => {
     setCompletionMap((prev) => {
@@ -580,8 +638,10 @@ export default function HuntPage() {
               items={catItems}
               completionMap={completionMap}
               token={tokenRef.current}
+              photos={galleryByCategory.get(cat) ?? []}
               onCompleted={handleCompleted}
               onDeleted={handleDeleted}
+              onPhotoClick={setLightboxPhoto}
             />
           )
         })}
@@ -591,6 +651,12 @@ export default function HuntPage() {
       <nav className="fixed bottom-0 left-0 right-0 bg-gray-900 border-t border-gray-800 px-4 py-3">
         <div className="flex items-center justify-between max-w-lg mx-auto">
           <span className="text-sm font-semibold text-fuchsia-400">Hunt</span>
+          <a
+            href="/gallery"
+            className="text-sm text-gray-400 hover:text-white transition-colors"
+          >
+            📷 Gallery
+          </a>
           <a
             href="/leaderboard"
             className="text-sm text-gray-400 hover:text-white transition-colors"
@@ -605,6 +671,39 @@ export default function HuntPage() {
           </button>
         </div>
       </nav>
+
+      {/* Lightbox */}
+      {lightboxPhoto && (
+        <div
+          className="fixed inset-0 z-50 bg-black/95 flex flex-col"
+          onClick={() => setLightboxPhoto(null)}
+        >
+          <div className="flex-1 flex items-center justify-center p-4 min-h-0">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={`/api/photos/${lightboxPhoto.filename}`}
+              alt={lightboxPhoto.itemTitle}
+              className="max-w-full max-h-full object-contain rounded-lg"
+              onClick={(e) => e.stopPropagation()}
+            />
+          </div>
+          <div className="px-4 pb-10 pt-3 text-center" onClick={(e) => e.stopPropagation()}>
+            <p className="text-white font-semibold text-sm">{lightboxPhoto.itemTitle}</p>
+            <p className="text-gray-500 text-xs mt-1">
+              {lightboxPhoto.participantName}
+              {' · '}
+              {TEAMS[lightboxPhoto.team as TeamKey]?.emoji}{' '}
+              {TEAMS[lightboxPhoto.team as TeamKey]?.name}
+            </p>
+            <button
+              className="mt-4 text-gray-500 text-xs hover:text-white transition-colors"
+              onClick={() => setLightboxPhoto(null)}
+            >
+              Close
+            </button>
+          </div>
+        </div>
+      )}
     </main>
   )
 }

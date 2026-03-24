@@ -85,7 +85,12 @@ export default function LeaderboardPage() {
           ← Back
         </button>
         <h1 className="text-lg font-bold text-white">Leaderboard</h1>
-        <span className="ml-auto text-xs text-gray-600">Updates every 30s</span>
+        <div className="ml-auto flex items-center gap-3">
+          <a href="/gallery" className="text-xs text-gray-400 hover:text-white transition-colors">
+            📷 Gallery
+          </a>
+          <span className="text-xs text-gray-600">Updates every 30s</span>
+        </div>
       </div>
 
       <div className="max-w-lg mx-auto px-4 pt-6 space-y-8">
