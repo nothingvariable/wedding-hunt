@@ -74,14 +74,17 @@ function ItemCard({
     setUploading(true)
     setError('')
 
+    let step = 'start'
     try {
-      // Use canvas to decode + re-encode as JPEG — avoids iOS Safari FileReader/FormData bugs
+      step = 'creating-object-url'
+      const objectUrl = URL.createObjectURL(selectedFile)
+
+      step = 'loading-image'
       const base64 = await new Promise<string>((resolve, reject) => {
-        const objectUrl = URL.createObjectURL(selectedFile)
         const img = new window.Image()
         img.onload = () => {
           URL.revokeObjectURL(objectUrl)
-          // Scale down if larger than 2048px on longest side to keep payload reasonable
+          step = 'drawing-canvas'
           const MAX = 2048
           let w = img.naturalWidth
           let h = img.naturalHeight
@@ -95,12 +98,14 @@ function ItemCard({
           const ctx = canvas.getContext('2d')
           if (!ctx) { reject(new Error('Canvas unavailable')); return }
           ctx.drawImage(img, 0, 0, w, h)
+          step = 'exporting-jpeg'
           resolve(canvas.toDataURL('image/jpeg', 0.85))
         }
-        img.onerror = () => { URL.revokeObjectURL(objectUrl); reject(new Error('Image load failed')) }
+        img.onerror = (e) => { URL.revokeObjectURL(objectUrl); reject(new Error('Image load failed: ' + String(e))) }
         img.src = objectUrl
       })
 
+      step = 'sending-request'
       const res = await fetch(`/api/complete/${item.key}`, {
         method: 'POST',
         headers: {
@@ -110,6 +115,7 @@ function ItemCard({
         body: JSON.stringify({ photo: base64, mimeType: 'image/jpeg' }),
       })
 
+      step = 'reading-response'
       if (!res.ok) {
         const data = await res.json()
         setError(data.error || 'Upload failed')
@@ -117,13 +123,14 @@ function ItemCard({
         return
       }
 
+      step = 'parsing-response'
       const data = await res.json()
       onCompleted(data.completion)
       setSelectedFile(null)
       setPreviewUrl(null)
       if (fileInputRef.current) fileInputRef.current.value = ''
     } catch (err) {
-      setError('Upload failed: ' + (err instanceof Error ? err.message : String(err)))
+      setError(`[${step}] ${err instanceof Error ? err.message : String(err)}`)
     }
     setUploading(false)
   }
