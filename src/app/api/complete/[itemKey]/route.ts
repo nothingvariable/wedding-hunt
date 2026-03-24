@@ -11,6 +11,7 @@ export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ itemKey: string }> }
 ) {
+  try {
   await runMigrations()
 
   const participant = await getParticipantFromRequest(request)
@@ -95,6 +96,11 @@ export async function POST(
   }
 
   return NextResponse.json({ completion })
+  } catch (err) {
+    const message = err instanceof Error ? err.message + '\n' + err.stack : String(err)
+    console.error('POST /api/complete error:', message)
+    return NextResponse.json({ error: message }, { status: 500 })
+  }
 }
 
 export async function DELETE(

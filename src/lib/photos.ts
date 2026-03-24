@@ -21,22 +21,10 @@ export async function savePhoto(
 ): Promise<void> {
   ensurePhotoDir()
 
-  // Dynamically import sharp to avoid issues at build time
-  const sharp = (await import('sharp')).default
-
-  const isHeic =
-    mimeType === 'image/heic' ||
-    mimeType === 'image/heif' ||
-    filename.toLowerCase().endsWith('.heic') ||
-    filename.toLowerCase().endsWith('.heif')
-
   const outputPath = path.join(PHOTO_DIR, filename)
 
-  if (isHeic) {
-    await sharp(buffer).jpeg({ quality: 85 }).toFile(outputPath)
-  } else {
-    await sharp(buffer).jpeg({ quality: 85 }).toFile(outputPath)
-  }
+  // Canvas already outputs JPEG — write directly, skip sharp
+  await fs.promises.writeFile(outputPath, buffer)
 }
 
 export async function deletePhoto(filename: string): Promise<void> {
