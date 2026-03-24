@@ -7,7 +7,7 @@ import { savePhoto, deletePhoto, MAX_UPLOAD_SIZE } from '@/lib/photos'
 
 export async function POST(
   request: NextRequest,
-  { params }: { params: { itemKey: string } }
+  { params }: { params: Promise<{ itemKey: string }> }
 ) {
   await runMigrations()
 
@@ -16,7 +16,7 @@ export async function POST(
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
-  const { itemKey } = params
+  const { itemKey } = await params
   const item = getItemByKey(itemKey)
   if (!item) {
     return NextResponse.json({ error: 'Item not found' }, { status: 404 })
@@ -94,7 +94,7 @@ export async function POST(
 
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { itemKey: string } }
+  { params }: { params: Promise<{ itemKey: string }> }
 ) {
   await runMigrations()
 
@@ -103,7 +103,7 @@ export async function DELETE(
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
-  const { itemKey } = params
+  const { itemKey } = await params
 
   const existing = await query<{ photo_filename: string | null }>(
     'SELECT photo_filename FROM completions WHERE participant_id = $1 AND item_key = $2',

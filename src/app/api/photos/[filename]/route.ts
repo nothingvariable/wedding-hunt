@@ -5,9 +5,9 @@ import { PHOTO_DIR } from '@/lib/photos'
 
 export async function GET(
   _request: NextRequest,
-  { params }: { params: { filename: string } }
+  { params }: { params: Promise<{ filename: string }> }
 ) {
-  const { filename } = params
+  const { filename } = await params
 
   // Sanitize filename to prevent path traversal
   const sanitized = path.basename(filename)
