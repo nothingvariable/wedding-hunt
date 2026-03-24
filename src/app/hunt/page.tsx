@@ -74,14 +74,22 @@ function ItemCard({
     setUploading(true)
     setError('')
 
-    const formData = new FormData()
-    formData.append('photo', selectedFile)
-
     try {
+      // Read file as base64 — more reliable than FormData on iOS Safari
+      const base64 = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader()
+        reader.onload = () => resolve(reader.result as string)
+        reader.onerror = reject
+        reader.readAsDataURL(selectedFile)
+      })
+
       const res = await fetch(`/api/complete/${item.key}`, {
         method: 'POST',
-        headers: { Authorization: `Bearer ${token}` },
-        body: formData,
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ photo: base64, mimeType: selectedFile.type }),
       })
 
       if (!res.ok) {

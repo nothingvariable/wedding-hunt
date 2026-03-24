@@ -31,30 +31,32 @@ export async function POST(
   let photoFilename: string | null = null
 
   if (item.proofType === 'photo') {
-    let formData: FormData
+    let body: { photo?: string; mimeType?: string }
     try {
-      formData = await request.formData()
+      body = await request.json()
     } catch {
-      return NextResponse.json({ error: 'Expected multipart/form-data' }, { status: 400 })
+      return NextResponse.json({ error: 'Expected JSON body with photo data' }, { status: 400 })
     }
 
-    const photoFile = formData.get('photo')
-    if (!photoFile || !(photoFile instanceof Blob)) {
+    if (!body.photo) {
       return NextResponse.json({ error: 'Photo is required for this item' }, { status: 400 })
     }
 
-    if (photoFile.size > MAX_UPLOAD_SIZE) {
+    // Strip data URL prefix (e.g. "data:image/jpeg;base64,")
+    const base64Data = body.photo.includes(',') ? body.photo.split(',')[1] : body.photo
+    const buffer = Buffer.from(base64Data, 'base64')
+
+    if (buffer.length > MAX_UPLOAD_SIZE) {
       return NextResponse.json(
         { error: `Photo exceeds max size of ${MAX_UPLOAD_SIZE} bytes` },
         { status: 413 }
       )
     }
 
-    const mimeType = photoFile.type || 'image/jpeg'
+    const mimeType = body.mimeType || 'image/jpeg'
     const timestamp = Date.now()
     photoFilename = `${participant.team}-${participant.id}-${itemKey}-${timestamp}.jpg`
 
-    const buffer = Buffer.from(await photoFile.arrayBuffer())
     await savePhoto(buffer, mimeType, photoFilename)
   }
 
