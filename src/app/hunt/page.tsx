@@ -117,8 +117,13 @@ function ItemCard({
 
       step = 'reading-response'
       if (!res.ok) {
-        const data = await res.json()
-        setError(data.error || 'Upload failed')
+        let errorMsg = `HTTP ${res.status} ${res.statusText}`
+        try {
+          const text = await res.text()
+          const trimmed = text.slice(0, 200).replace(/<[^>]+>/g, '').trim()
+          if (trimmed) errorMsg += ': ' + trimmed
+        } catch { /* ignore */ }
+        setError(errorMsg)
         setUploading(false)
         return
       }
